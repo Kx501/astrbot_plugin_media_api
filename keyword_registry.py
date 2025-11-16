@@ -11,12 +11,12 @@ from threading import RLock
 class KeywordRegistry:
     """关键词注册表"""
     
-    def __init__(self, similarity_threshold: float = 0.6):
+    def __init__(self, similarity_threshold: float = 0.5):
         """
         初始化关键词注册表
         
         Args:
-            similarity_threshold: 相似度阈值，默认0.6（60%相似度）
+            similarity_threshold: 相似度阈值，默认0.5（50%相似度）
         """
         # 平台 -> [(关键词, api_id, media_type), ...]
         self._platform_apis: Dict[str, List[Tuple[str, str, str]]] = {}
@@ -86,11 +86,23 @@ class KeywordRegistry:
         
         # 2. 部分匹配：query包含keyword或keyword包含query
         if keyword_lower in query_lower:
-            # query包含keyword，相似度 = keyword长度 / query长度
-            return len(keyword_lower) / len(query_lower) if query_lower else 0.0
+            # query包含keyword（完整关键词），相似度 = keyword长度 / query长度，但至少0.8
+            ratio = len(keyword_lower) / len(query_lower) if query_lower else 0.0
+            return max(ratio, 0.8)  # 完整包含时给予高相似度
+        
         if query_lower in keyword_lower:
-            # keyword包含query，相似度 = query长度 / keyword长度
-            return len(query_lower) / len(keyword_lower) if keyword_lower else 0.0
+            # keyword包含query（查询是关键词的一部分），这是最常见的情况
+            # 相似度基于包含比例，但给予更高的权重
+            base_ratio = len(query_lower) / len(keyword_lower) if keyword_lower else 0.0
+            # 如果query长度>=2且包含在keyword中，至少给予0.7的相似度
+            # 如果query长度>=3，给予0.8的相似度
+            if len(query_lower) >= 3:
+                return max(base_ratio, 0.8)
+            elif len(query_lower) >= 2:
+                return max(base_ratio, 0.7)
+            else:
+                # 单字符匹配，使用基础比例但至少0.5
+                return max(base_ratio, 0.5)
         
         # 3. 使用SequenceMatcher计算整体相似度
         return SequenceMatcher(None, query_lower, keyword_lower).ratio()
