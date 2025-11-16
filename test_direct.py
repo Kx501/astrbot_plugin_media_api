@@ -37,31 +37,19 @@ async def test_direct():
             "group_id": None
         },
         {
-            "name": "测试3: 获取热舞视频",
-            "query": "热舞",
-            "media_type": "video",
-            "group_id": None
-        },
-        {
-            "name": "测试4: 获取黑丝视频（相似度匹配）",
+            "name": "测试3: 获取黑丝视频（相似度匹配）",
             "query": "黑丝",
             "media_type": "video",
             "group_id": None
         },
         {
-            "name": "测试5: 获取黑丝视频（部分匹配）",
-            "query": "黑丝系列视频",
-            "media_type": "video",
-            "group_id": None
-        },
-        {
-            "name": "测试6: 获取小姐姐视频（lolimi平台）",
+            "name": "测试4: 获取小姐姐视频（lolimi平台）",
             "query": "小姐姐",
             "media_type": "video",
             "group_id": None
         },
         {
-            "name": "测试7: 测试无效关键词",
+            "name": "测试5: 测试无效关键词",
             "query": "无效关键词123",
             "media_type": "all",
             "group_id": None
@@ -94,6 +82,11 @@ async def test_direct():
             print(f"[调用失败] {str(e)}")
             import traceback
             traceback.print_exc()
+        
+        # 测试调用间冷却（避免请求过于频繁）
+        if i < len(test_cases):
+            print("\n等待3秒后继续下一个测试...")
+            await asyncio.sleep(3)
     
     print("\n" + "=" * 60)
     print("测试完成！")

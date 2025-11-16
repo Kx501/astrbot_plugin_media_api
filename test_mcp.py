@@ -52,27 +52,22 @@ async def test_mcp_tool():
             # 测试用例列表
             test_cases = [
                 {
-                    "name": "测试1: 获取自拍图片（精确匹配）",
+                    "name": "测试1: 获取自拍图片",
                     "query": "自拍",
                     "media_type": "image"
                 },
                 {
-                    "name": "测试2: 获取自拍图片（部分匹配）",
-                    "query": "随机自拍图片",
-                    "media_type": "image"
+                    "name": "测试2: 获取热舞视频",
+                    "query": "热舞",
+                    "media_type": "video"
                 },
                 {
-                    "name": "测试3: 获取黑丝视频（相似度匹配）",
+                    "name": "测试3: 获取黑丝视频",
                     "query": "黑丝",
                     "media_type": "video"
                 },
                 {
-                    "name": "测试4: 获取黑丝视频（部分匹配）",
-                    "query": "黑丝系列视频",
-                    "media_type": "video"
-                },
-                {
-                    "name": "测试5: 测试无效关键词",
+                    "name": "测试4: 测试无效关键词",
                     "query": "无效关键词123",
                     "media_type": "all"
                 },
@@ -113,6 +108,11 @@ async def test_mcp_tool():
                     print(f"[调用失败] {str(e)}")
                     import traceback
                     traceback.print_exc()
+                
+                # 测试调用间冷却（避免请求过于频繁）
+                if i < len(test_cases):
+                    print("\n等待1秒后继续下一个测试...")
+                    await asyncio.sleep(1)
             
             print("\n" + "=" * 60)
             print("测试完成！")

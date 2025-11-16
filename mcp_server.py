@@ -25,10 +25,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 全局管理器
-config_manager = ConfigManager()
-cache_manager = CacheManager()
-failure_tracker = FailureTracker(config_manager)
-keyword_registry = get_registry()
+try:
+    config_manager = ConfigManager()
+    cache_manager = CacheManager()
+    failure_tracker = FailureTracker(config_manager)
+    keyword_registry = get_registry()
+    logger.info("Global managers initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize managers: {e}", exc_info=True)
+    # 即使初始化失败，也要确保工具可以注册
+    # 使用占位符，避免运行时错误
+    config_manager = None
+    cache_manager = None
+    failure_tracker = None
+    keyword_registry = None
 
 
 async def get_media(
@@ -48,6 +58,10 @@ async def get_media(
         结果字典，包含url和type，或error
     """
     logger.info(f"get_media called: query={query}, media_type={media_type}, group_id={group_id}")
+    
+    # 检查管理器是否已初始化
+    if config_manager is None:
+        return {"error": "MCP服务器初始化失败，请检查配置文件和日志"}
     
     try:
         # 1. 预处理：按权限过滤平台
@@ -192,27 +206,28 @@ server = Server("media-api-mcp")
 @server.list_tools()
 async def list_tools() -> list[Tool]:
     """列出所有可用的工具（只有一个工具）"""
-    return [
-        Tool(
-            name="get_media",
-            description="获取媒体资源（图片/视频/音频）",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "搜索关键词"
-                    },
-                    "media_type": {
-                        "type": "string",
-                        "description": "媒体类型：image/video/audio/all",
-                        "default": "all"
-                    }
+    logger.info("list_tools called, returning get_media tool")
+    tool = Tool(
+        name="get_media",
+        description="获取媒体资源（图片/视频/音频）",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "搜索关键词"
                 },
-                "required": ["query"]
-            }
-        )
-    ]
+                "media_type": {
+                    "type": "string",
+                    "description": "媒体类型：image/video/audio/all",
+                    "default": "all"
+                }
+            },
+            "required": ["query"]
+        }
+    )
+    logger.info(f"Tool registered: {tool.name}")
+    return [tool]
 
 
 @server.call_tool()
@@ -242,6 +257,15 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 async def main():
     """主函数"""
     logger.info("Starting MCP server...")
+    logger.info(f"Server name: {server.name}")
+    
+    # 验证工具注册
+    try:
+        tools = await server.list_tools()
+        logger.info(f"Registered {len(tools)} tool(s): {[t.name for t in tools]}")
+    except Exception as e:
+        logger.error(f"Error listing tools: {e}", exc_info=True)
+    
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream,
