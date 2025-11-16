@@ -1,0 +1,15 @@
+{
+  "global": {
+    "disabled_platforms": [],
+    "disabled_apis": []
+  },
+  "groups": {},
+  "platforms": {
+    "ak317": {
+      "ckey": "YOUR_CKEY_HERE"
+    },
+    "xingchenfu": {},
+    "lolimi": {}
+  }
+}
+
