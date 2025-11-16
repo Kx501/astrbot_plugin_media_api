@@ -25,20 +25,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 全局管理器
-try:
-    config_manager = ConfigManager()
-    cache_manager = CacheManager()
-    failure_tracker = FailureTracker(config_manager)
-    keyword_registry = get_registry()
-    logger.info("Global managers initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize managers: {e}", exc_info=True)
-    # 即使初始化失败，也要确保工具可以注册
-    # 使用占位符，避免运行时错误
-    config_manager = None
-    cache_manager = None
-    failure_tracker = None
-    keyword_registry = None
+config_manager = ConfigManager()
+cache_manager = CacheManager()
+failure_tracker = FailureTracker(config_manager)
+keyword_registry = get_registry()
+logger.info("Global managers initialized successfully")
 
 
 async def get_media(
@@ -58,10 +49,6 @@ async def get_media(
         结果字典，包含url和type，或error
     """
     logger.info(f"get_media called: query={query}, media_type={media_type}, group_id={group_id}")
-    
-    # 检查管理器是否已初始化
-    if config_manager is None:
-        return {"error": "MCP服务器初始化失败，请检查配置文件和日志"}
     
     try:
         # 1. 预处理：按权限过滤平台
@@ -209,7 +196,7 @@ async def list_tools() -> list[Tool]:
     logger.info("list_tools called, returning get_media tool")
     tool = Tool(
         name="get_media",
-        description="获取媒体资源（图片/视频/音频）",
+        description="通过API获取各种媒体资源（图片/视频/音频）",
         inputSchema={
             "type": "object",
             "properties": {

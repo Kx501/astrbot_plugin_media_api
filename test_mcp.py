@@ -111,8 +111,8 @@ async def test_mcp_tool():
                 
                 # 测试调用间冷却（避免请求过于频繁）
                 if i < len(test_cases):
-                    print("\n等待1秒后继续下一个测试...")
-                    await asyncio.sleep(1)
+                    print("\n等待3秒后继续下一个测试...")
+                    await asyncio.sleep(3)
             
             print("\n" + "=" * 60)
             print("测试完成！")
