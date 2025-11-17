@@ -47,6 +47,7 @@ pip install -r requirements.txt
 ### 配置
 
 1. 复制配置文件模板：
+
 ```bash
 cp config/config.json.example config/config.json
 ```
@@ -256,13 +257,13 @@ from platform_base import PlatformBase, MediaResource
 class MyPlatform(PlatformBase):
     def __init__(self):
         super().__init__("my_platform")
-        
+      
         # API映射：API标识 -> (URL, 标题, 媒体类型)
         self.api_map = {
             "api1": ("https://api.example.com/v1", "示例图片", "image"),
             "api2": ("https://api.example.com/v2", "示例视频", "video")
         }
-        
+      
         # 从api_map自动注册所有API到全局注册表
         self.register_apis_from_map(self.api_map)
   
@@ -270,7 +271,7 @@ class MyPlatform(PlatformBase):
         # api_id由MCP服务器传入，根据api_id调用对应的API
         if not api_id or api_id not in self.api_map:
             raise Exception(f"未找到API标识{api_id}")
-        
+      
         api_url, title, api_media_type = self.api_map[api_id]
         # 实现搜索逻辑
         return [MediaResource(url="...", media_type=api_media_type)]
@@ -281,7 +282,7 @@ class MyPlatform(PlatformBase):
   
     def get_available_apis(self):
         return ["search"]  # 必须包含"search"
-    
+  
     def get_supported_media_types(self):
         # 从api_map中提取所有唯一的媒体类型
         media_types = set()
@@ -346,4 +347,4 @@ PLATFORMS = {
 
 ## 许可证
 
-MIT
+Apache License

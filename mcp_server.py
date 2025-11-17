@@ -1,5 +1,5 @@
 """
-MCP服务器主入口
+通用MCP服务器主入口
 提供多平台媒体API的MCP工具
 """
 import asyncio
@@ -117,26 +117,17 @@ async def get_media(
         platform, api_id, api_media_type = random.choice(enabled_apis)
         logger.info(f"Selected: platform={platform}, api_id={api_id} (from {len(enabled_apis)} matched APIs)")
         
-        # 6. 检查缓存（使用api_id作为缓存key的一部分）
-        cache_key = f"{query}:{media_type}:{platform}:{api_id}"
-        if cache_manager.has_cache(query, media_type, platform):
-            cached_result = cache_manager.get_cache(query, media_type, platform)
-            logger.info(f"Cache hit for {platform}:{api_id}: {query}")
-            return cached_result
-        
-        logger.info(f"Cache miss for {platform}:{api_id}: {query}")
-        
-        # 7. 获取平台实例
+        # 6. 获取平台实例
         platform_instance = get_platform(platform)
         if not platform_instance:
             error_msg = f"平台 {platform} 不存在"
             logger.error(error_msg)
             return {"error": error_msg}
         
-        # 8. 获取平台配置
+        # 7. 获取平台配置
         platform_config = config_manager.get_platform_config(platform)
         
-        # 9. 调用平台API（传入api_id）
+        # 8. 调用平台API（传入api_id）
         try:
             results = await platform_instance.search_media(
                 query=query,
@@ -149,18 +140,18 @@ async def get_media(
             if not results:
                 raise Exception("未找到结果")
             
-            # 8. 只返回第一个结果（最简化格式）
+            # 9. 只返回第一个结果（最简化格式）
             first_result = results[0]
             result = {
                 "url": first_result.url,
                 "type": first_result.media_type
             }
             
-            # 9. 缓存结果
+            # 10. 缓存结果（用于失败时的备用方案）
             cache_manager.set_cache(query, media_type, platform, result)
             logger.info(f"Successfully got media from {platform}, cached")
             
-            # 10. 重置失败计数（使用api_id）
+            # 11. 重置失败计数（使用api_id）
             failure_tracker.reset_failure(platform, api_id, group_id)
             
             return result
@@ -169,10 +160,10 @@ async def get_media(
             error_msg = f"API调用失败: {str(e)}"
             logger.error(f"{platform} API error: {error_msg}")
             
-            # 11. 记录失败（使用api_id）
+            # 12. 记录失败（使用api_id）
             failure_tracker.record_failure(platform, api_id, group_id)
             
-            # 12. 尝试使用缓存
+            # 13. 尝试使用缓存（失败时的备用方案）
             cached_result = cache_manager.get_cache(query, media_type, platform)
             if cached_result:
                 logger.info(f"Using cached result after failure")
@@ -222,11 +213,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """处理工具调用"""
     try:
         if name == "get_media":
-            # group_id不在schema中声明，但支持接收
+            # group_id不在schema中声明，由astrbot框架根据消息上下文自动注入
+            # LLM不会看到此参数，也不会尝试填充
             result = await get_media(
                 query=arguments.get("query"),
                 media_type=arguments.get("media_type", "all"),
-                group_id=arguments.get("group_id")  # 可选，Bot框架可以自动注入
+                group_id=arguments.get("group_id")  # 由框架自动注入，不在schema中
             )
             
             # 返回JSON字符串
