@@ -5,17 +5,18 @@ import json
 import random
 import time
 from typing import List, Dict, Any, AsyncGenerator, Optional
+from pathlib import Path
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
+from .config_manager import ConfigManager
+from .cache_manager import CacheManager
+from .failure_tracker import FailureTracker
+from .keyword_registry import get_registry
+from .platforms import get_platform
 
-from config_manager import ConfigManager
-from cache_manager import CacheManager
-from failure_tracker import FailureTracker
-from keyword_registry import get_registry
-from platforms import get_platform
 
-
+@register("media_api", "Kx501", "媒体资源获取工具，用于调用第三方api获取资源，返回给LLM的工具", "v1.0.0", "https://github.com/Kx501/media_api")
 class MediaApiTool(Star):
     """
     AstrBot 媒体API工具插件
@@ -25,8 +26,12 @@ class MediaApiTool(Star):
         """插件初始化"""
         super().__init__(context)
         
+        # 获取插件目录路径，用于配置文件路径
+        plugin_dir = Path(__file__).parent
+        config_path = plugin_dir / "config" / "config.json"
+        
         # 初始化全局管理器
-        self.config_manager = ConfigManager()
+        self.config_manager = ConfigManager(str(config_path))
         self.cache_manager = CacheManager()
         self.failure_tracker = FailureTracker(self.config_manager)
         self.keyword_registry = get_registry()
