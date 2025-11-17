@@ -3,9 +3,8 @@
 提供随机自拍图片和多个视频系列API
 """
 import httpx
-import random
 from typing import List, Optional, Dict, Any
-from platform_base import PlatformBase, MediaResource, MediaType
+from ..platform_base import PlatformBase, MediaResource
 
 
 # API错误码映射

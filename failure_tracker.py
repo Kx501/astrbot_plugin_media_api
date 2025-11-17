@@ -4,7 +4,7 @@
 """
 from typing import Dict, Optional
 from threading import RLock
-from config_manager import ConfigManager
+from .config_manager import ConfigManager
 
 
 class FailureTracker:

@@ -4,7 +4,7 @@
 """
 import httpx
 from typing import List, Optional, Dict, Any
-from platform_base import PlatformBase, MediaResource, MediaType
+from ..platform_base import PlatformBase, MediaResource, MediaType
 
 
 class ExamplePlatform(PlatformBase):

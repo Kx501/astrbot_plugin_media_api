@@ -4,7 +4,7 @@
 """
 import httpx
 from typing import List, Optional, Dict, Any
-from platform_base import PlatformBase, MediaResource
+from ..platform_base import PlatformBase, MediaResource
 
 
 # API错误码映射

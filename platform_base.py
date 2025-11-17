@@ -5,7 +5,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 from enum import Enum
-from keyword_registry import get_registry
+from .keyword_registry import get_registry
 
 
 class MediaType(Enum):

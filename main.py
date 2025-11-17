@@ -41,15 +41,14 @@ class MediaApiTool(Star):
     @filter.llm_tool(name="get_media")
     async def get_media(self, event: AstrMessageEvent, query: str, media_type: str = "all") -> str:
         """
-        获取媒体资源的LLM工具，支持通过关键词搜索图片、视频、音频等媒体资源。
-        工具会自动匹配关键词，从可用的平台中随机选择一个API来获取媒体资源。
+        搜索媒体资源（图片/视频/音频）
         
         Args:
-            query(string): 搜索关键词，例如"猫猫"、"风景"、"音乐"等
-            media_type(string): 媒体类型，可选值："image"/"video"/"audio"/"all"，默认为"all"
+            query(string): 关键词
+            media_type(string): 类型：image/video/audio/all
         
         Returns:
-            返回JSON字符串，成功时包含url和type字段，失败时包含error字段
+            JSON：成功{url,type}，失败{error}
         """
         start_time = time.time()
         
