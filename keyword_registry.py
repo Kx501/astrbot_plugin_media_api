@@ -1,22 +1,24 @@
 """
 关键词注册表模块
-管理平台到关键词的映射，提供相似度匹配功能
+管理平台到关键词的映射，提供BM25算法匹配功能
 支持注册(关键词, api_id, media_type)三元组
 """
 from typing import Dict, List, Set, Tuple, Optional
-from difflib import SequenceMatcher
 from threading import RLock
+import re
 
 
 class KeywordRegistry:
     """关键词注册表"""
     
-    def __init__(self, similarity_threshold: float = 0.5):
+    def __init__(self, similarity_threshold: float = 0.3, k1: float = 1.5, b: float = 0.75):
         """
         初始化关键词注册表
         
         Args:
-            similarity_threshold: 相似度阈值，默认0.5（50%相似度）
+            similarity_threshold: BM25得分阈值，默认0.3
+            k1: BM25参数k1，控制词频饱和度，默认1.5
+            b: BM25参数b，控制文档长度归一化，默认0.75
         """
         # 平台 -> [(关键词, api_id, media_type), ...]
         self._platform_apis: Dict[str, List[Tuple[str, str, str]]] = {}
@@ -24,6 +26,10 @@ class KeywordRegistry:
         self._all_keywords: Set[str] = set()
         self._lock = RLock()
         self.similarity_threshold = similarity_threshold
+        self.k1 = k1
+        self.b = b
+        # 缓存：关键词 -> 分词列表
+        self._keyword_tokens_cache: Dict[str, List[str]] = {}
     
     def register(self, platform: str, keyword: str, api_id: str, media_type: str):
         """
@@ -66,46 +72,125 @@ class KeywordRegistry:
                 
                 del self._platform_apis[platform]
     
-    def _calculate_similarity(self, query: str, keyword: str) -> float:
+    def _tokenize(self, text: str) -> List[str]:
         """
-        计算两个字符串的相似度（支持部分匹配）
+        对中文文本进行分词（简化版：字符级+词级）
+        
+        Args:
+            text: 输入文本
+        
+        Returns:
+            分词列表
+        """
+        text = text.lower().strip()
+        if not text:
+            return []
+        
+        # 如果已缓存，直接返回
+        if text in self._keyword_tokens_cache:
+            return self._keyword_tokens_cache[text]
+        
+        tokens = []
+        # 提取所有中文字符和连续的非中文字符
+        # 匹配中文字符、英文单词、数字
+        pattern = r'[\u4e00-\u9fff]+|[a-zA-Z]+|\d+'
+        matches = re.findall(pattern, text)
+        
+        # 对于中文和英文，同时添加字符级和词级token
+        for match in matches:
+            if re.match(r'[\u4e00-\u9fff]+', match):
+                # 中文：添加完整词 + 每个字符
+                tokens.append(match)  # 完整词
+                # 对于短词（<=4），也添加字符级token以提高匹配度
+                if len(match) <= 4:
+                    for char in match:
+                        tokens.append(char)
+            elif re.match(r'[a-zA-Z]+', match):
+                # 英文：添加完整单词
+                tokens.append(match.lower())  # 完整单词（转小写）
+                # 对于短单词（<=5），也添加所有可能的子串以提高部分匹配
+                # 例如："cosxl" -> ["cosxl", "cosx", "cos", "osxl", "sxl", "xl"]
+                if len(match) <= 5:
+                    match_lower = match.lower()
+                    # 添加所有长度>=2的前缀（用于部分匹配）
+                    for i in range(2, len(match_lower)):
+                        prefix = match_lower[:i]
+                        if prefix not in tokens:
+                            tokens.append(prefix)
+            else:
+                # 数字：作为整体添加
+                tokens.append(match)
+        
+        # 缓存结果
+        self._keyword_tokens_cache[text] = tokens
+        return tokens
+    
+    def _calculate_bm25_score(self, query: str, keyword: str) -> float:
+        """
+        使用BM25算法计算查询和关键词的匹配得分
         
         Args:
             query: 查询字符串
             keyword: 关键词
         
         Returns:
-            相似度（0.0-1.0）
+            BM25得分（越高越匹配）
         """
+        query_tokens = self._tokenize(query)
+        keyword_tokens = self._tokenize(keyword)
+        
+        if not query_tokens or not keyword_tokens:
+            return 0.0
+        
+        # 计算IDF（逆文档频率）
+        # 简化版：使用词在关键词中的频率
+        keyword_token_set = set(keyword_tokens)
+        keyword_length = len(keyword_tokens)
+        
+        score = 0.0
+        for token in query_tokens:
+            if token in keyword_token_set:
+                # 计算词频（TF）
+                tf = keyword_tokens.count(token)
+                
+                # 简化的IDF：如果词在关键词中出现，给予较高权重
+                # 对于完全匹配的词，给予更高权重
+                if token == query or token == keyword:
+                    idf = 2.0  # 完全匹配的权重
+                elif len(token) >= 2:
+                    idf = 1.5  # 多字符词的权重
+                else:
+                    idf = 0.5  # 单字符的权重
+                
+                # BM25公式（简化版，针对短文本优化）
+                # score += idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (keyword_length / avg_length)))
+                # 对于短文本，简化公式
+                avg_length = 5  # 假设平均关键词长度为5
+                normalization = 1 - self.b + self.b * (keyword_length / avg_length)
+                bm25_tf = (tf * (self.k1 + 1)) / (tf + self.k1 * normalization)
+                score += idf * bm25_tf
+        
+        # 归一化得分（除以查询词数量）
+        if len(query_tokens) > 0:
+            score = score / len(query_tokens)
+        
+        # 额外奖励：如果查询完全包含在关键词中，给予大幅加分
         query_lower = query.lower()
         keyword_lower = keyword.lower()
-        
-        # 1. 精确匹配
-        if query_lower == keyword_lower:
-            return 1.0
-        
-        # 2. 部分匹配：query包含keyword或keyword包含query
-        if keyword_lower in query_lower:
-            # query包含keyword（完整关键词），相似度 = keyword长度 / query长度，但至少0.8
-            ratio = len(keyword_lower) / len(query_lower) if query_lower else 0.0
-            return max(ratio, 0.8)  # 完整包含时给予高相似度
-        
         if query_lower in keyword_lower:
-            # keyword包含query（查询是关键词的一部分），这是最常见的情况
-            # 相似度基于包含比例，但给予更高的权重
-            base_ratio = len(query_lower) / len(keyword_lower) if keyword_lower else 0.0
-            # 如果query长度>=2且包含在keyword中，至少给予0.7的相似度
-            # 如果query长度>=3，给予0.8的相似度
-            if len(query_lower) >= 3:
-                return max(base_ratio, 0.8)
-            elif len(query_lower) >= 2:
-                return max(base_ratio, 0.7)
+            # 计算包含比例
+            contain_ratio = len(query_lower) / len(keyword_lower)
+            # 如果查询是关键词的主要部分（>=50%），给予大幅加分
+            if contain_ratio >= 0.5:
+                score += 2.0  # 大幅加分，确保能匹配到
             else:
-                # 单字符匹配，使用基础比例但至少0.5
-                return max(base_ratio, 0.5)
+                score += contain_ratio * 1.0  # 较小加分
         
-        # 3. 使用SequenceMatcher计算整体相似度
-        return SequenceMatcher(None, query_lower, keyword_lower).ratio()
+        # 精确匹配给予最高分
+        if query_lower == keyword_lower:
+            score = 10.0
+        
+        return score
     
     def find_matching_apis(
         self,
@@ -144,11 +229,11 @@ class KeywordRegistry:
                     if media_type != "all" and media_type != api_media_type:
                         continue
                     
-                    # 计算相似度
-                    similarity = self._calculate_similarity(query, keyword)
+                    # 使用BM25算法计算匹配得分
+                    score = self._calculate_bm25_score(query, keyword)
                     
-                    # 如果相似度达到阈值，添加到匹配列表
-                    if similarity >= self.similarity_threshold:
+                    # 如果得分达到阈值，添加到匹配列表
+                    if score >= self.similarity_threshold:
                         matching_apis.append((platform, api_id, api_media_type))
             
             return matching_apis
