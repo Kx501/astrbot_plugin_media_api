@@ -40,16 +40,15 @@ class MediaApiTool(Star):
         logger.info("媒体API工具插件已加载")
 
     @filter.llm_tool(name="get_media")
-    async def get_media(self, event: AstrMessageEvent, query: str, media_type: str = "all") -> str:
+    async def get_media(self, event: AstrMessageEvent, query: str, media_type: str = "all") -> AsyncGenerator[MessageEventResult, None]:
         """
-        用户想获取图片/视频/音频时调用，通过第三方API搜索一条媒体资源。
+        用户想要图片/视频/音频时必须调用此工具，通过第三方API搜索并直接发送一条媒体资源。
         
         Args:
-            query(string): 关键词，如"猫系女友"、"cos"
+            query(string): 关键词，如"黑丝"、"cos"
             media_type(string): image/video/audio/all
         
-        Returns:
-            string: JSON格式，成功{"url":"...","type":"..."}，失败{"error":"..."}
+        注意：此工具会直接发送媒体文件，而不是返回链接。
         """
         start_time = time.time()
         
@@ -67,12 +66,20 @@ class MediaApiTool(Star):
             elapsed_time = time.time() - start_time
             logger.info(f"媒体API工具调用完成，耗时 {elapsed_time:.2f}s")
             
-            return json.dumps(result, ensure_ascii=False)
+            # 如果成功，发送媒体文件
+            if "error" not in result:
+                media_chain = []
+                self._add_media_component(media_chain, result)
+                if media_chain:  # 只有当媒体组件添加成功时才发送
+                    yield event.chain_result(media_chain)
+            else:
+                # 如果失败，发送错误消息
+                yield event.plain_result(f"获取媒体资源失败: {result['error']}")
             
         except Exception as e:
             elapsed_time = time.time() - start_time
             logger.error(f"获取媒体资源时发生错误: {e}，耗时 {elapsed_time:.2f}s", exc_info=True)
-            return json.dumps({"error": f"获取媒体资源时发生内部错误: {str(e)}"}, ensure_ascii=False)
+            yield event.plain_result(f"获取媒体资源时发生内部错误: {str(e)}")
 
     async def _get_media_internal(
         self,
@@ -132,7 +139,17 @@ class MediaApiTool(Star):
                 # 匹配失败，返回错误提示
                 all_keywords = self.keyword_registry.get_all_keywords()
                 if all_keywords:
-                    keywords_str = "、".join(all_keywords[:20])  # 最多显示20个关键词
+                    # 如果关键词太多（超过20个），生成图片
+                    if len(all_keywords) > 20:
+                        # 关键词过多，返回关键词列表供文本显示
+                        return {
+                            "error": "未匹配到关键词",
+                            "keywords": all_keywords,
+                            "keywords_count": len(all_keywords)
+                        }
+                    
+                    # 关键词较少时，使用文本
+                    keywords_str = "、".join(all_keywords[:20])
                     if len(all_keywords) > 20:
                         keywords_str += f"等{len(all_keywords)}个关键词"
                     error_msg = f"未匹配到关键词，可用关键词：{keywords_str}"
@@ -219,22 +236,66 @@ class MediaApiTool(Star):
             logger.error(error_msg, exc_info=True)
             return {"error": error_msg}
 
-    @filter.command("测试媒体", alias={"test_media"})
-    async def test_media(self, event: AstrMessageEvent) -> AsyncGenerator[MessageEventResult, None]:
-        """测试指令：手动触发媒体API查询"""
-        start_time = time.time()
+    def _add_media_component(self, result_chain: List, media_data: dict):
+        """
+        添加媒体组件到消息链
         
-        # 从消息中提取参数（简单示例，实际可能需要更复杂的解析）
-        message_text = event.get_message_text() if hasattr(event, 'get_message_text') else ""
-        
-        # 简单解析：假设格式为 "测试媒体 关键词 [类型]"
-        parts = message_text.split()
-        if len(parts) < 2:
-            yield event.plain_result("用法：测试媒体 <关键词> [类型]\n例如：测试媒体 猫猫 image")
+        Args:
+            result_chain: 消息链列表
+            media_data: 包含 url 和 type 的字典
+        """
+        if "error" in media_data or "url" not in media_data or "type" not in media_data:
             return
         
-        query = parts[1]
-        media_type = parts[2] if len(parts) > 2 else "all"
+        url_or_path = media_data["url"]
+        media_type = media_data["type"]
+        
+        # 判断是 URL 还是文件路径
+        is_url = url_or_path.startswith(("http://", "https://", "ftp://"))
+        is_file = Path(url_or_path).exists() if not is_url else False
+        
+        # 根据类型和来源添加媒体组件
+        try:
+            if media_type == "image":
+                if is_url:
+                    result_chain.append(Comp.Image.fromURL(url_or_path))
+                    logger.info(f"添加图片(URL): {url_or_path}")
+                elif is_file:
+                    result_chain.append(Comp.Image.fromFileSystem(url_or_path))
+                    logger.info(f"添加图片(文件): {url_or_path}")
+                else:
+                    # 尝试作为 URL 处理（可能是相对路径或其他格式）
+                    result_chain.append(Comp.Image.fromURL(url_or_path))
+                    logger.info(f"添加图片(尝试URL): {url_or_path}")
+            elif media_type == "video":
+                if is_url:
+                    result_chain.append(Comp.Video.fromURL(url_or_path))
+                    logger.info(f"添加视频(URL): {url_or_path}")
+                elif is_file:
+                    result_chain.append(Comp.Video.fromFileSystem(path=url_or_path))
+                    logger.info(f"添加视频(文件): {url_or_path}")
+                else:
+                    # 尝试作为 URL 处理
+                    result_chain.append(Comp.Video.fromURL(url_or_path))
+                    logger.info(f"添加视频(尝试URL): {url_or_path}")
+            elif media_type == "audio":
+                if is_url:
+                    result_chain.append(Comp.Record(url=url_or_path, file=url_or_path))
+                    logger.info(f"添加音频(URL): {url_or_path}")
+                elif is_file:
+                    result_chain.append(Comp.Record(file=url_or_path, url=url_or_path))
+                    logger.info(f"添加音频(文件): {url_or_path}")
+                else:
+                    # 尝试作为 URL 处理
+                    result_chain.append(Comp.Record(url=url_or_path, file=url_or_path))
+                    logger.info(f"添加音频(尝试URL): {url_or_path}")
+        except Exception as e:
+            logger.error(f"添加媒体组件时发生错误: {e}", exc_info=True)
+
+    @filter.command("测试媒体", alias={"test_media"})
+    async def test_media(self, event: AstrMessageEvent, query: str, media_type: str = "all") -> AsyncGenerator[MessageEventResult, None]:
+        """测试指令：手动触发媒体API查询"""
+        start_time = time.time()
         
         group_id = event.get_group_id()
         if group_id:
@@ -249,86 +310,28 @@ class MediaApiTool(Star):
         
         try:
             if "error" in result:
-                yield event.plain_result(f"查询失败: {result['error']}\n耗时 {elapsed_time:.2f}s")
+                # 构建错误消息
+                error_msg = f"查询失败: {result['error']}\n耗时 {elapsed_time:.2f}s"
+                
+                # 如果有可用关键词，添加到消息中
+                if result.get("keywords") and len(result['keywords']) > 0:
+                    keywords_str = "、".join(result['keywords'][:20])
+                    if len(result['keywords']) > 20:
+                        keywords_str += f"等{result['keywords_count']}个关键词"
+                    error_msg += f"\n\n可用关键词：{keywords_str}"
+                
+                yield event.plain_result(error_msg)
             else:
-                result_text = f"查询成功（耗时 {elapsed_time:.2f}s）:\n"
-                result_text += f"类型: {result.get('type', '未知')}\n"
-                result_text += f"URL: {result.get('url', '未知')}"
-                yield event.plain_result(result_text)
+                # 先发送文本消息（包含耗时信息）
+                yield event.plain_result(f"查询成功（耗时 {elapsed_time:.2f}s）")
+                # 然后单独发送媒体资源（某些平台不支持文本和媒体混合发送）
+                media_chain = []
+                self._add_media_component(media_chain, result)
+                if media_chain:  # 只有当媒体组件添加成功时才发送
+                    yield event.chain_result(media_chain)
         except Exception as e:
             yield event.plain_result(f"处理结果时发生错误: {str(e)}")
 
-    @filter.on_decorating_result()
-    async def auto_send_media(self, event: AstrMessageEvent):
-        """自动发送工具返回的媒体资源"""
-        try:
-            result = event.get_result()
-            if not result or not result.chain:
-                return
-            
-            # 检查消息链中是否有工具调用的结果
-            # 查找包含 get_media 工具调用结果的文本
-            for comp in result.chain:
-                if isinstance(comp, Comp.Plain):
-                    text = comp.text
-                    # 尝试解析 JSON，查找媒体资源
-                    try:
-                        # 查找 JSON 格式的媒体资源
-                        if '"url"' in text and '"type"' in text:
-                            # 尝试提取 JSON
-                            start = text.find('{')
-                            end = text.rfind('}') + 1
-                            if start >= 0 and end > start:
-                                json_str = text[start:end]
-                                media_data = json.loads(json_str)
-                                
-                                if "url" in media_data and "type" in media_data and "error" not in media_data:
-                                    url_or_path = media_data["url"]
-                                    media_type = media_data["type"]
-                                    
-                                    # 判断是 URL 还是文件路径
-                                    is_url = url_or_path.startswith(("http://", "https://", "ftp://"))
-                                    is_file = Path(url_or_path).exists() if not is_url else False
-                                    
-                                    # 根据类型和来源添加媒体组件
-                                    if media_type == "image":
-                                        if is_url:
-                                            result.chain.append(Comp.Image.fromURL(url_or_path))
-                                            logger.info(f"自动添加图片(URL): {url_or_path}")
-                                        elif is_file:
-                                            result.chain.append(Comp.Image.fromFileSystem(url_or_path))
-                                            logger.info(f"自动添加图片(文件): {url_or_path}")
-                                        else:
-                                            # 尝试作为 URL 处理（可能是相对路径或其他格式）
-                                            result.chain.append(Comp.Image.fromURL(url_or_path))
-                                            logger.info(f"自动添加图片(尝试URL): {url_or_path}")
-                                    elif media_type == "video":
-                                        if is_url:
-                                            result.chain.append(Comp.Video.fromURL(url_or_path))
-                                            logger.info(f"自动添加视频(URL): {url_or_path}")
-                                        elif is_file:
-                                            result.chain.append(Comp.Video.fromFileSystem(path=url_or_path))
-                                            logger.info(f"自动添加视频(文件): {url_or_path}")
-                                        else:
-                                            # 尝试作为 URL 处理
-                                            result.chain.append(Comp.Video.fromURL(url_or_path))
-                                            logger.info(f"自动添加视频(尝试URL): {url_or_path}")
-                                    elif media_type == "audio":
-                                        if is_url:
-                                            result.chain.append(Comp.Record(url=url_or_path, file=url_or_path))
-                                            logger.info(f"自动添加音频(URL): {url_or_path}")
-                                        elif is_file:
-                                            result.chain.append(Comp.Record(file=url_or_path, url=url_or_path))
-                                            logger.info(f"自动添加音频(文件): {url_or_path}")
-                                        else:
-                                            # 尝试作为 URL 处理
-                                            result.chain.append(Comp.Record(url=url_or_path, file=url_or_path))
-                                            logger.info(f"自动添加音频(尝试URL): {url_or_path}")
-                    except (json.JSONDecodeError, KeyError, ValueError) as e:
-                        # 解析失败，忽略
-                        pass
-        except Exception as e:
-            logger.error(f"自动发送媒体资源时发生错误: {e}", exc_info=True)
 
     async def terminate(self) -> None:
         """插件卸载时调用"""
@@ -336,4 +339,3 @@ class MediaApiTool(Star):
         if hasattr(self.config_manager, 'stop_watching'):
             self.config_manager.stop_watching()
         logger.info("媒体API工具插件已卸载")
-

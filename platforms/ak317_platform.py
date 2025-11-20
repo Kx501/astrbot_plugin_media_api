@@ -45,7 +45,7 @@ class AK317Platform(PlatformBase):
             "ndxl": ("http://api.317ak.cn/api/sp/ndxl", "女大学生系列视频", "video"),
             "mncd": ("http://api.317ak.cn/api/sp/mncd", "美女穿搭视频", "video"),
             "rwxl": ("http://api.317ak.cn/api/sp/rwxl", "热舞系列视频", "video"),
-            "smwx": ("http://api.317ak.cn/api/sp/smwx", "双尾马系列视频", "video"),
+            "smwx": ("http://api.317ak.cn/api/sp/smwx", "双马尾系列视频", "video"),
             "ywxl": ("http://api.317ak.cn/api/sp/ywxl", "渔网系列视频", "video"),
             "slmm": ("http://api.317ak.cn/api/sp/slmm", "少萝妹妹系列视频", "video"),
             "cqng": ("http://api.317ak.cn/api/sp/cqng", "纯情女高系列视频", "video"),
