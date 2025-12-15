@@ -60,9 +60,6 @@ htmlcov/
 .tox/
 .hypothesis/
 
-# MCP相关
-.mcp/
-
 # 其他
 *.bak
 *.backup

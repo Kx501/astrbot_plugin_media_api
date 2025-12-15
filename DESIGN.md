@@ -1,12 +1,12 @@
-# 多平台媒体API MCP服务器 - 设计文档
+# AstrBot 媒体API插件 - 设计文档
 
-本文档整合了所有设计说明，包括配置设计、工具设计、优化方案等。
+本文档整合了 AstrBot 插件侧的设计说明，包括配置设计、工具设计、优化方案等。通用 MCP 服务器已移除，仅保留 AstrBot 场景。
 
 ## 目录
 
 1. [项目概述](#项目概述)
 2. [配置文件设计](#配置文件设计)
-3. [MCP工具设计](#mcp工具设计)
+3. [插件工具设计](#插件工具设计)
 4. [平台抽象层设计](#平台抽象层设计)
 5. [核心模块设计](#核心模块设计)
 6. [实现细节](#实现细节)
@@ -18,7 +18,7 @@
 
 ### 项目目标
 
-创建一个MCP（Model Context Protocol）服务器，集成多个第三方音视频和图片平台API，提供给QQ AI群聊bot使用。
+创建一个 AstrBot 插件，集成多个第三方音视频和图片平台API，提供给 QQ AI 群聊 bot 使用。
 
 ### 核心特性
 
@@ -26,17 +26,16 @@
 - **自动平台选择**：从可用平台中随机选择，Bot无需指定
 - **灵活的权限控制**：支持全局和群组两级禁用配置
 - **高可靠性**：缓存机制和自动禁用机制
-- **通用性**：支持非QQ Bot场景（group_id可选）
 
-### 项目结构
+### 项目结构（AstrBot 专用）
 
 ```
 media_api/
-├── mcp_server.py          # MCP服务器主入口
+├── main.py                 # AstrBot 插件入口
 ├── config_manager.py       # 配置管理模块（支持热重载、全局/群组权限检查）
 ├── platform_base.py        # 平台抽象基类
 ├── cache_manager.py        # 缓存管理模块（成功缓存、失败回退）
-├── failure_tracker.py     # 失败追踪模块（自动禁用机制）
+├── failure_tracker.py      # 失败追踪模块（自动禁用机制）
 ├── platforms/              # 各平台API客户端
 │   ├── __init__.py
 │   └── example_platform.py # 示例平台实现
@@ -184,13 +183,13 @@ media_api/
 
 ---
 
-## MCP工具设计
+## 插件工具设计
 
 ### 工具数量：只有一个核心工具
 
 **工具名**：`get_media`
 
-**设计原因**：减少Bot和MCP的交互次数，降低token消耗
+**设计原因**：减少 Bot 与插件的交互次数，降低 token 消耗
 
 ### 参数设计
 
@@ -200,11 +199,10 @@ media_api/
 - `media_type`（可选）：媒体类型，默认"all"
   - 可选值：`"image"` / `"video"` / `"audio"` / `"all"`
 
-#### 不在schema中声明但支持的参数：
+#### AstrBot 自动注入的参数（不在schema中声明）：
 
 - `group_id`（可选）：群组ID，用于权限检查
-  - **设计原因**：让MCP更通用，可用于非QQ Bot场景
-  - **自动注入**：由astrbot框架根据消息上下文自动注入，LLM不会看到此参数，也不会尝试填充
+  - **自动注入**：由 AstrBot 根据消息上下文自动注入，LLM 不会看到此参数，也不会尝试填充
   - 如果不提供，则跳过群组权限检查（所有平台都可用）
 
 ### Bot看到的工具定义
@@ -288,7 +286,7 @@ class PlatformBase(ABC):
         media_type: str = "all",
         config: Optional[Dict[str, Any]] = None,
         limit: int = 10,
-        api_id: Optional[str] = None  # 由MCP服务器传入
+        api_id: Optional[str] = None  # 由插件内部流程传入
     ) -> List[MediaResource]:
         """搜索媒体资源（必需，所有平台都应实现）"""
         pass
@@ -442,7 +440,7 @@ class MediaResource:
 
 ## 实现细节
 
-### MCP服务器主流程
+### 插件内部流程
 
 ```python
 @server.call_tool()
@@ -571,7 +569,7 @@ Bot调用：
 }
 ```
 
-MCP处理：
+插件处理：
 
 1. 检查群组123456789的权限配置
 2. 从启用的平台中随机选择一个（如pixabay）
@@ -601,7 +599,7 @@ Bot调用：
 }
 ```
 
-MCP处理：
+插件处理：
 
 1. 没有group_id，跳过群组权限检查
 2. 从所有已配置的平台中随机选择一个
@@ -669,7 +667,7 @@ MCP处理：
 ## 技术栈
 
 - Python 3.8+
-- `mcp` SDK（MCP协议实现）
+- AstrBot 插件 API
 - `httpx`（异步HTTP请求）
 - `watchdog`（配置文件热重载监控）
 

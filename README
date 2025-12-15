@@ -1,6 +1,6 @@
-# 多平台媒体API MCP服务器
+# AstrBot 媒体API工具插件
 
-一个用于QQ AI群聊bot的多平台媒体API集合MCP服务器，支持音视频和图片资源的获取。
+一个面向 AstrBot 的多平台媒体 API 插件，专注于在群聊中为 LLM 提供图片/视频/音频能力。通用 MCP 服务器已移除，仅保留 AstrBot 场景。
 
 ## 功能特性
 
@@ -8,27 +8,27 @@
 - ✅ **智能平台选择**：先按类型过滤，再相似度匹配关键词，最后随机选择
 - ✅ **灵活的权限控制**：支持全局和群组两级禁用配置，可精确到单个API
 - ✅ **高可靠性**：缓存机制和自动禁用机制
-- ✅ **通用性**：支持非QQ Bot场景（group_id可选）
+- ✅ **深度集成**：基于 AstrBot Star 插件体系
 - ✅ **配置文件热重载**：修改配置后自动生效
 - ✅ **详细日志**：方便调试和监控
 - ✅ **相似度匹配**：支持精确匹配、部分匹配和模糊匹配
 
-## 项目结构
+## 项目结构（AstrBot 专用）
 
 ```
 media_api/
-├── mcp_server.py          # MCP服务器主入口
+├── main.py                 # AstrBot 插件入口（Star）
 ├── config_manager.py       # 配置管理模块（支持热重载、全局/群组权限检查）
 ├── platform_base.py        # 平台抽象基类
 ├── cache_manager.py        # 缓存管理模块（成功缓存、失败回退）
-├── failure_tracker.py     # 失败追踪模块（自动禁用机制）
-├── keyword_registry.py    # 关键词注册表（相似度匹配）
+├── failure_tracker.py      # 失败追踪模块（自动禁用机制）
+├── keyword_registry.py     # 关键词注册表（相似度匹配）
 ├── platforms/              # 各平台API客户端
 │   ├── __init__.py
-│   ├── ak317_platform.py  # AK317平台实现
-│   ├── xingchenfu_platform.py # 星晨福平台实现
-│   ├── lolimi_platform.py # Lolimi平台实现
-│   └── example_platform.py # 示例平台实现
+│   ├── ak317_platform.py
+│   ├── xingchenfu_platform.py
+│   ├── lolimi_platform.py
+│   └── example_platform.py
 ├── config/                 # 配置文件目录
 │   └── config.json         # 统一配置文件
 ├── requirements.txt        # Python依赖
@@ -75,9 +75,7 @@ cp config/config.json.example config/config.json
 
 ### 运行
 
-```bash
-python mcp_server.py
-```
+此仓库仅作为 AstrBot 插件使用，无需单独启动 MCP 服务器。将项目作为插件放入 AstrBot 的 `plugins` 目录后重启 AstrBot 即可加载。
 
 ## 配置说明
 
@@ -106,7 +104,7 @@ python mcp_server.py
 
 详细配置说明请参考 [DESIGN.md](DESIGN.md)
 
-## MCP工具
+## 插件工具（面向 LLM）
 
 ### get_media
 
@@ -118,9 +116,9 @@ python mcp_server.py
 - `media_type`（可选）：媒体类型，默认"all"
   - 可选值：`"image"` / `"video"` / `"audio"` / `"all"`
 
-**参数（不在schema中声明，但支持）**：
+**参数（由 AstrBot 注入，不在 schema 中声明）**：
 
-- `group_id`（可选）：群组ID，用于权限检查
+- `group_id`（可选）：群组ID，用于权限检查（由 AstrBot 根据上下文自动注入）
 
 **返回格式**：
 
@@ -257,13 +255,13 @@ from platform_base import PlatformBase, MediaResource
 class MyPlatform(PlatformBase):
     def __init__(self):
         super().__init__("my_platform")
-      
+    
         # API映射：API标识 -> (URL, 标题, 媒体类型)
         self.api_map = {
             "api1": ("https://api.example.com/v1", "示例图片", "image"),
             "api2": ("https://api.example.com/v2", "示例视频", "video")
         }
-      
+    
         # 从api_map自动注册所有API到全局注册表
         self.register_apis_from_map(self.api_map)
   
@@ -271,7 +269,7 @@ class MyPlatform(PlatformBase):
         # api_id由MCP服务器传入，根据api_id调用对应的API
         if not api_id or api_id not in self.api_map:
             raise Exception(f"未找到API标识{api_id}")
-      
+    
         api_url, title, api_media_type = self.api_map[api_id]
         # 实现搜索逻辑
         return [MediaResource(url="...", media_type=api_media_type)]

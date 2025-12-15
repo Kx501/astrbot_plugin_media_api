@@ -1,5 +1,5 @@
 """
-AstrBot专用MCP服务器入口
+AstrBot插件入口
 """
 import json
 import random
@@ -42,7 +42,7 @@ class MediaApiTool(Star):
     @filter.llm_tool(name="get_media")
     async def get_media(self, event: AstrMessageEvent, query: str, media_type: str = "all") -> AsyncGenerator[MessageEventResult, None]:
         """
-        用户想要图片/视频/音频时必须调用此工具，通过第三方API搜索并直接发送一条媒体资源。
+        用户要求图片、视频、音频时调用此工具，会在短视频平台搜索并发送一条媒体资源。
         
         Args:
             query(string): 关键词，如"黑丝"、"cos"

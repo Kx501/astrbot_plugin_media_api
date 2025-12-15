@@ -1,5 +1,6 @@
 name: "api媒体资源获取"
 author: "Kx501"
 description: "媒体资源获取工具，用于调用第三方api获取资源，返回给LLM的工具"
+tags: ["媒体资源", "第三方api", "工具"]
 version: "v1.0.0"
 repo: "https://github.com/Kx501/media_api"
