@@ -25,9 +25,6 @@ media_api/
 ├── keyword_registry.py     # 关键词注册表（相似度匹配）
 ├── platforms/              # 各平台API客户端
 │   ├── __init__.py
-│   ├── ak317_platform.py
-│   ├── xingchenfu_platform.py
-│   ├── lolimi_platform.py
 │   └── example_platform.py
 ├── config/                 # 配置文件目录
 │   └── config.json         # 统一配置文件
@@ -62,16 +59,14 @@ cp config/config.json.example config/config.json
   },
   "groups": {},
   "platforms": {
-    "ak317": {
+    "platform1": {
       "ckey": "your-ckey-here"
     },
-    "xingchenfu": {},
-    "lolimi": {}
+    "platform2": {},
+    "platform3": {}
   }
 }
 ```
-
-**注意**：`config/config.json` 包含敏感信息，已被 `.gitignore` 忽略，不会提交到版本控制。
 
 ### 运行
 
@@ -136,110 +131,6 @@ cp config/config.json.example config/config.json
   "error": "错误信息"
 }
 ```
-
-## 已实现平台
-
-### AK317平台
-
-支持随机自拍图片和多个视频系列API。
-
-**配置**：
-
-```json
-{
-  "platforms": {
-    "ak317": {
-      "ckey": "你的CKEY值"
-    }
-  }
-}
-```
-
-**使用方式**：
-
-- 通过query参数匹配API标题（相似度匹配）：
-  - **图片API**：`"自拍"` 或 `"随机自拍图片"` → 随机自拍图片
-  - **视频API**（共25个）：
-    - `"倾梦"`、`"猫系"`、`"少萝"`、`"女大学生"`、`"穿搭"`、`"热舞"`、`"双马尾"`、`"渔网"`、`"少萝妹妹"`、`"纯情女高"`
-    - `"极品狱卒"`、`"玉足美腿"`、`"清纯"`、`"COS"`、`"萝莉"`、`"完美身材"`、`"蹲下变装"`、`"吊带"`、`"黑丝"`、`"女仆"`
-    - `"又纯又欲"`、`"甩裙"`、`"白丝"`、`"黑白双煞"`、`"慢摇"`
-- 支持相似度匹配，如 `"黑丝视频"` 可以匹配到 `"黑丝系列视频"`
-- 如果未匹配到关键词，将返回错误提示并列出可用关键词
-
-**示例**：
-
-- query="自拍", media_type="image" → 返回随机自拍图片
-- query="倾梦", media_type="video" → 返回倾梦推荐视频
-- query="热舞", media_type="video" → 返回热舞系列视频
-- query="黑丝", media_type="video" → 返回黑丝系列视频
-
-### 星晨福平台
-
-支持多个视频和图片API。
-
-**配置**：
-
-```json
-{
-  "platforms": {
-    "xingchenfu": {}
-  }
-}
-```
-
-注意：此平台无需配置参数，可直接使用。
-
-**使用方式**：
-
-- 通过query参数匹配API标题（相似度匹配）：
-  - **视频API**：
-    - `"女大"` 或 `"女大学生"` → 女大学生视频
-    - `"黑丝"` → 黑丝视频
-    - `"白丝"` → 白丝视频
-    - `"小姐姐"` → 小姐姐视频
-    - `"jk"` 或 `"JK"` → JK视频
-    - `"cos"` 或 `"COS"` → COS视频
-  - **图片API**：
-    - `"黑丝图片"` → 黑丝图片
-    - `"美腿"` → 美腿图片
-    - `"cosplay"` 或 `"cos图片"` → 随机cosplay图片
-- 支持相似度匹配，如 `"黑丝"` 可以匹配到 `"黑丝视频"` 或 `"黑丝图片"`
-- 如果未匹配到关键词，将返回错误提示并列出可用关键词
-
-**示例**：
-
-- query="女大", media_type="video" → 返回女大视频
-- query="黑丝", media_type="video" → 返回黑丝视频
-- query="jk", media_type="video" → 返回JK视频
-- query="美腿", media_type="image" → 返回美腿图片
-- query="cosplay", media_type="image" → 返回随机cosplay图片
-
-### Lolimi平台
-
-支持随机小姐姐视频API。
-
-**配置**：
-
-```json
-{
-  "platforms": {
-    "lolimi": {}
-  }
-}
-```
-
-注意：此平台无需配置参数，可直接使用。
-
-**使用方式**：
-
-- 通过query参数匹配API标题（相似度匹配）：
-  - `"小姐姐"` 或 `"高质量小姐姐视频"` → 高质量小姐姐视频
-- 只支持video类型，不支持image或audio类型
-
-**示例**：
-
-- query="", media_type="video" → 返回随机视频
-- query="小姐姐", media_type="video" → 返回随机视频
 
 ## 添加新平台
 
